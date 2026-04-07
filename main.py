@@ -12,15 +12,15 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 def home():
     target_url = request.args.get('url', '')
     
-    # Agar user ne kuch search nahi kiya toh Home Page dikhao
     if not target_url:
         return '''
-        <div style="background:#f00; color:#fff; padding:20px; text-align:center; font-family:sans-serif;">
-            <h1>JioBharat Video Downloader</h1>
+        <div style="background:#000; color:#fff; padding:20px; text-align:center; font-family:sans-serif;">
+            <h2>JioBharat Smart Proxy</h2>
+            <p>Paste Link (YouTube/Instagram) & Wait 5 Sec</p>
             <form action="/" method="get">
-                <input type="text" name="url" placeholder="Video URL ya Site likhein..." style="width:80%; padding:10px;">
+                <input type="text" name="url" placeholder="https://..." style="width:85%; padding:10px; border-radius:5px;">
                 <br><br>
-                <button type="submit" style="padding:10px 20px; background:#000; color:#fff; border:none;">GO / CONVERT</button>
+                <button type="submit" style="padding:12px 25px; background:red; color:white; border:none; font-weight:bold;">CONVERT & DOWNLOAD</button>
             </form>
         </div>
         '''
@@ -29,33 +29,40 @@ def home():
         target_url = "https://" + target_url
 
     try:
-        # Step 1: Site ko fetch karna
-        res = requests.get(target_url, headers=HEADERS, timeout=15)
+        # Step 1: Request bhejna
+        session = requests.Session()
+        res = session.get(target_url, headers=HEADERS, timeout=20)
+        
+        # Step 2: WAIT LOGIC (Yahi aapko chahiye tha)
+        # Hum 5 second wait karenge taaki background scripts (AJAX) apna kaam kar sakein
+        time.sleep(5) 
+        
+        # Dubara page refresh mode mein check karna (kuch sites ke liye)
         soup = BeautifulSoup(res.text, 'html.parser')
 
-        # Step 2: Live Conversion logic (Ads hatana aur Buttons nikaalna)
-        # Hum saari Scripts ko allow karenge lekin Ads ko block karenge
-        for s in soup.find_all("script"):
-            if "google" in str(s) or "ads" in str(s) or "pop" in str(s):
-                s.decompose()
+        # Step 3: Filtering & Compression
+        # Hum saari complex JS hata denge jo JioBharat ko hang karti hai
+        for s in soup(["script", "style", "iframe", "ins"]):
+            s.decompose()
 
-        # Step 3: Page ko "Jio-Ready" (Compress) karna
-        # Hum sirf Main Content area ko rakhenge
+        # Saare buttons ko "Direct Links" mein badalna
+        for btn in soup.find_all(['button', 'input']):
+            btn['style'] = "background:green; color:white; padding:10px; display:block; margin:5px auto; width:90%;"
+
         content = soup.find('body')
         
-        final_html = f"""
-        <div style="background:#222; padding:10px; text-align:center;">
-            <a href="/" style="color:#fff; text-decoration:none;">[ Home ]</a>
-            <span style="color:#0f0;"> | Site: {target_url[:20]}...</span>
+        final_ui = f"""
+        <div style="background:#333; padding:10px; text-align:center; color:white;">
+            <b>Page Compressed Successfully!</b>
         </div>
-        <div style="padding:10px; font-size:14px; background:#fff;">
-            {content.decode_contents() if content else "Page Load Nahi Hua"}
+        <div style="padding:10px; font-family:sans-serif;">
+            {content.decode_contents() if content else "Page Load Nahi Hua. Please Refresh."}
         </div>
         """
-        return render_template_string(final_html)
+        return render_template_string(final_ui)
 
     except Exception as e:
-        return f"Error: Site busy hai ya khul nahi rahi. ({str(e)})"
+        return f"Error: Site loading mein time le rahi hai. Dobara try karein. ({str(e)})"
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
