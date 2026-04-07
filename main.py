@@ -4,47 +4,45 @@ from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-# Ultra-Lite User Agent (Purane phones jaisa behavior)
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (NokiaS40; AppleWebkit/534.13) Gecko/20110303"
-}
+HEADERS = {"User-Agent": "Mozilla/5.0 (NokiaS40; AppleWebkit/534.13) Gecko/20110303"}
 
 @app.route('/')
 def home():
-    target_url = "https://www.instagram.com/"
+    # User agar koi URL search kare toh wo 'url' parameter mein aayega
+    target_url = request.args.get('url', 'https://www.google.com')
+    
+    if not target_url.startswith('http'):
+        target_url = "https://" + target_url
+
     try:
-        # Instagram se data lena
-        response = requests.get(target_url, headers=HEADERS, timeout=15)
-        soup = BeautifulSoup(response.text, 'html.parser')
+        res = requests.get(target_url, headers=HEADERS, timeout=10)
+        soup = BeautifulSoup(res.text, 'html.parser')
 
-        # Sabhi bhari cheezein (Scripts/Styles) ko delete karna
-        for element in soup(["script", "style", "link", "video"]):
-            element.decompose()
+        # Clean-up: Heavy files hatana
+        for s in soup(["script", "style", "video"]):
+            s.decompose()
 
-        # Sirf zaroori text aur links ko bachana
-        clean_text = soup.get_text(separator=' ')
-        
-        # Simple HTML Template jo har browser par chale
-        html_output = f"""
-        <html>
-            <head>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Insta Lite Access</title>
-            </head>
-            <body style="background-color:#fff; color:#000; font-family:monospace; padding:10px;">
-                <h3 style="background:#d62976; color:white; padding:5px;">INSTAGRAM LITE MODE</h3>
-                <hr>
-                <div style="border:1px solid #000; padding:5px; margin-bottom:10px;">
-                    {clean_text[:5000]}...
-                </div>
-                <hr>
-                <p><i>System: Compressed for Low-End Browsers</i></p>
-            </body>
-        </html>
+        # Simple Search Bar Design (JioBharat ke liye optimized)
+        search_html = f"""
+        <div style="background:#222; padding:10px; color:white; text-align:center;">
+            <form action="/" method="get">
+                <input type="text" name="url" placeholder="Site ka naam likhein (e.g. instagram.com)" style="width:70%; padding:5px;">
+                <button type="submit" style="padding:5px;">GO</button>
+            </form>
+            <div style="margin-top:5px; font-size:12px;">
+                Quick: <a href="/?url=instagram.com" style="color:yellow;">Insta</a> | 
+                <a href="/?url=facebook.com" style="color:yellow;">FB</a> | 
+                <a href="/?url=google.com" style="color:yellow;">Google</a>
+            </div>
+        </div>
+        <hr>
+        <div style="padding:10px; font-family:sans-serif;">
+            {soup.body.decode_contents() if soup.body else "Page load nahi ho saka."}
+        </div>
         """
-        return render_template_string(html_output)
+        return render_template_string(search_html)
     except Exception as e:
-        return f"System Error: {str(e)}"
+        return f"Error: Site khul nahi rahi. Error: {str(e)}"
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
