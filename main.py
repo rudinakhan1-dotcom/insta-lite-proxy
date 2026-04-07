@@ -3,46 +3,44 @@ import requests
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-
-HEADERS = {"User-Agent": "Mozilla/5.0 (NokiaS40; AppleWebkit/534.13) Gecko/20110303"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
 @app.route('/')
 def home():
-    # User agar koi URL search kare toh wo 'url' parameter mein aayega
     target_url = request.args.get('url', 'https://www.google.com')
-    
     if not target_url.startswith('http'):
         target_url = "https://" + target_url
 
     try:
-        res = requests.get(target_url, headers=HEADERS, timeout=10)
+        # y2mate ya kisi bhi site ko fetch karna
+        res = requests.get(target_url, headers=HEADERS, timeout=15)
         soup = BeautifulSoup(res.text, 'html.parser')
 
-        # Clean-up: Heavy files hatana
-        for s in soup(["script", "style", "video"]):
-            s.decompose()
+        # Conversion buttons ke liye zaroori scripts ko rehne dena
+        # Sirf Ads aur Tracker scripts ko hatana
+        for s in soup.find_all("script"):
+            if "ads" in str(s) or "analytics" in str(s):
+                s.decompose()
 
-        # Simple Search Bar Design (JioBharat ke liye optimized)
-        search_html = f"""
-        <div style="background:#222; padding:10px; color:white; text-align:center;">
+        # Relative links ko absolute banana taaki buttons kaam karein
+        for a in soup.find_all('a', href=True):
+            if a['href'].startswith('/'):
+                a['href'] = target_url.rstrip('/') + a['href']
+
+        search_ui = f"""
+        <div style="background:#000; padding:10px; color:#fff; text-align:center;">
             <form action="/" method="get">
-                <input type="text" name="url" placeholder="Site ka naam likhein (e.g. instagram.com)" style="width:70%; padding:5px;">
-                <button type="submit" style="padding:5px;">GO</button>
+                <input type="text" name="url" placeholder="Paste URL or Site" style="width:65%;">
+                <button type="submit">GO</button>
             </form>
-            <div style="margin-top:5px; font-size:12px;">
-                Quick: <a href="/?url=instagram.com" style="color:yellow;">Insta</a> | 
-                <a href="/?url=facebook.com" style="color:yellow;">FB</a> | 
-                <a href="/?url=google.com" style="color:yellow;">Google</a>
-            </div>
         </div>
-        <hr>
-        <div style="padding:10px; font-family:sans-serif;">
-            {soup.body.decode_contents() if soup.body else "Page load nahi ho saka."}
+        <div id="proxy-content" style="padding:5px;">
+            {soup.body.decode_contents() if soup.body else "Loading..."}
         </div>
         """
-        return render_template_string(search_html)
+        return render_template_string(search_ui)
     except Exception as e:
-        return f"Error: Site khul nahi rahi. Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
