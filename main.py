@@ -2,89 +2,72 @@ from flask import Flask, render_template_string, request
 import requests
 from bs4 import BeautifulSoup
 import urllib.parse
-import time
 
 app = Flask(__name__)
 
-# User-Agent taaki sites ko lage ki hum browser hain
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
+# Advanced Mobile Headers (JioBharat ke liye best)
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
+    "Accept-Language": "hi-IN,hi;q=0.9,en-US;q=0.8,en;q=0.7"
+}
 
 @app.route('/')
 def home():
     query = request.args.get('q', '')
     url_to_open = request.args.get('url', '')
 
-    # AGAR USER KUCH SEARCH KARE (Google Search Logic)
+    # 1. FIXED GOOGLE SEARCH (Using a different endpoint)
     if query:
-        search_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&hl=hi" # hl=hi se Hindi/English mix aayega
+        # Hum Google ke 'm' (mobile) version ko use karenge jo block kam hota hai
+        search_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&adtest=off"
         try:
-            res = requests.get(search_url, headers=HEADERS)
+            res = requests.get(search_url, headers=HEADERS, timeout=10)
             soup = BeautifulSoup(res.text, 'html.parser')
             
-            # Google ke faltu headers hatana
-            for s in soup(["script", "style"]): s.decompose()
-            
+            # Sirf kaam ke links nikalna
             results = ""
-            for g in soup.find_all('div', class_='tF2Cxc') or soup.find_all('div', class_='kCrYT'):
-                link = g.find('a')['href']
-                title = g.find('h3').text if g.find('h3') else "Link"
-                # Proxy ke zariye link kholne ke liye
-                results += f'<div style="margin-bottom:15px;"><a href="/?url={link}" style="color:blue; font-size:18px; font-weight:bold;">{title}</a><br><small>{link[:50]}...</small></div>'
+            for link in soup.find_all('a'):
+                href = link.get('href')
+                if href and '/url?q=' in href:
+                    actual_link = href.split('/url?q=')[1].split('&')[0]
+                    title = link.text if link.text else actual_link
+                    if "google" not in actual_link: # Google ke internal links hatao
+                        results += f'<div style="margin-bottom:15px; border-bottom:1px dotted #ccc; padding:5px;"><a href="/?url={actual_link}" style="color:blue; font-size:16px; text-decoration:none;"><b>{title}</b></a></div>'
 
-            return f"""
-            <div style="background:#f2f2f2; padding:10px; border-bottom:2px solid red;">
-                <form action="/" method="get">
-                    <input type="text" name="q" value="{query}" style="width:70%; padding:8px;">
-                    <button type="submit">Search</button>
-                </form>
-            </div>
-            <div style="padding:15px;">{results if results else "No results found. Try again."}</div>
-            """
+            return f'<div style="padding:10px; background:#eee;"><form><input name="q" value="{query}" style="width:70%;"><button>Search</button></form></div><div style="padding:10px;">{results if results else "No results. Search again."}</div>'
         except:
-            return "Search fail ho gaya. Internet check karein."
+            return "Search temporarily blocked by Google. Try again in 1 min."
 
-    # AGAR USER KOI SITE KHOLNA CHAHE (Proxy Logic)
+    # 2. FIXED INSTA/FB LOGIN (Using Mobile Subdomain)
     if url_to_open:
+        # Force Mobile Version for Facebook/Instagram
+        if "facebook.com" in url_to_open:
+            url_to_open = "https://m.facebook.com"
+        if "instagram.com" in url_to_open:
+            url_to_open = "https://www.instagram.com/accounts/login/"
+
         try:
-            # Facebook/Insta ke liye language and session handling
-            res = requests.get(url_to_open, headers=HEADERS, timeout=20)
-            time.sleep(2) # Chhota wait taaki logo se aage badhe
+            res = requests.get(url_to_open, headers=HEADERS, timeout=15)
+            # Content ko simplify karna
+            page_content = res.text.replace('href="/', f'href="/?url={url_to_open.split(".com")[0]}.com/')
             
-            soup = BeautifulSoup(res.text, 'html.parser')
-            
-            # Instagram/Facebook fix: Heavy JS hatana par links rakhna
-            for s in soup(["script", "style", "iframe"]): s.decompose()
-
-            # Sabhi relative links ko hamare proxy link mein badalna
-            for a in soup.find_all('a', href=True):
-                original = a['href']
-                if original.startswith('/'):
-                    base = "/".join(url_to_open.split('/')[:3])
-                    a['href'] = f"/?url={base}{original}"
-                else:
-                    a['href'] = f"/?url={original}"
-
-            return f"""
-            <div style="background:black; color:white; padding:5px; text-align:center;">
-                <a href="/" style="color:yellow;">[ Naya Search ]</a> | Browsing: {url_to_open[:20]}
-            </div>
-            <div style="padding:10px;">{soup.body.decode_contents() if soup.body else "Content load nahi hua."}</div>
-            """
+            return f'<div style="background:#333; color:white; padding:5px;"><a href="/" style="color:yellow;">[ Home ]</a></div>{page_content}'
         except:
-            return "Site khulne mein problem ho rahi hai."
+            return "Link open nahi ho raha. Site ne block kiya hai."
 
-    # DEFAULT HOME PAGE (Google Look-alike)
+    # 3. CLEAN HOME PAGE
     return '''
-    <div style="text-align:center; padding-top:50px; font-family: sans-serif;">
-        <h1 style="color:red; font-size:40px;">Jio<span style="color:black;">Search</span></h1>
+    <div style="text-align:center; padding:20px; font-family:sans-serif;">
+        <h2 style="color:red;">Jio Search Engine</h2>
         <form action="/" method="get">
-            <input type="text" name="q" placeholder="Kuch bhi search karein..." style="width:80%; padding:15px; border-radius:25px; border:1px solid #ccc;">
-            <br><br>
-            <button type="submit" style="padding:10px 20px; background:#f8f9fa; border:1px solid #ccc; cursor:pointer;">Google Search</button>
+            <input type="text" name="q" placeholder="Search anything..." style="width:85%; padding:10px; border-radius:5px;"><br><br>
+            <button type="submit" style="padding:10px 20px; background:blue; color:white; border:none;">Google Search</button>
         </form>
-        <div style="margin-top:30px;">
-            <a href="/?url=https://www.facebook.com" style="margin:10px; text-decoration:none; color:blue;">Facebook</a> |
-            <a href="/?url=https://www.instagram.com" style="margin:10px; text-decoration:none; color:purple;">Instagram</a>
+        <hr>
+        <div style="margin-top:20px;">
+            <a href="/?url=https://m.facebook.com" style="display:block; padding:10px; background:#3b5998; color:white; text-decoration:none; margin:5px; border-radius:5px;">Open Facebook</a>
+            <a href="/?url=https://www.instagram.com/accounts/login/" style="display:block; padding:10px; background:#e1306c; color:white; text-decoration:none; margin:5px; border-radius:5px;">Open Instagram</a>
+            <a href="/?url=https://y2mate.is" style="display:block; padding:10px; background:green; color:white; text-decoration:none; margin:5px; border-radius:5px;">Video Downloader</a>
         </div>
     </div>
     '''
