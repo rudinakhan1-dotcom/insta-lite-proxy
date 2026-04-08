@@ -6,14 +6,14 @@ import cloudinary.api
 
 app = Flask(__name__)
 
-# --- CONFIGURATION ---
+# --- CONFIGURATION (Fixed Details) ---
 cloudinary.config( 
   cloud_name = "dntmgunma", 
   api_key = "247386995162694", 
   api_secret = "Z4NDEGSgXqA5eUdNlRbjL6V-FoE" 
 )
 
-# --- UI (Added Name Input & Download) ---
+# --- UI (Download + Title Support) ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -32,17 +32,14 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <h3>Video Cloud Manager</h3>
-    
     <div class="box">
         <form action="/upload" method="post" enctype="multipart/form-data">
-            <input type="text" name="title" placeholder="Video ka naam likho..." required>
+            <input type="text" name="title" placeholder="Video ka naam..." required>
             <input type="file" name="file" required>
             <button type="submit" class="up-btn">Upload Video</button>
         </form>
     </div>
-
     <hr style="border: 0.5px solid #444;">
-
     {% for v in videos %}
     <div class="v-card">
         <h4 style="margin: 5px 0; color: #ffc107;">{{ v.public_id }}</h4>
@@ -68,10 +65,9 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload():
     file = request.files.get('file')
-    title = request.form.get('title') # User ka diya hua naam
+    title = request.form.get('title')
     if file:
         try:
-            # Title ko public_id bana diya taaki wahi naam dikhe
             cloudinary.uploader.upload(file, resource_type="video", public_id=title)
         except Exception as e:
             print(f"Error: {e}")
