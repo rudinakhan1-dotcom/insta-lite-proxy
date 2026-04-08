@@ -4,45 +4,53 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    query = request.args.get('q', '')
     url_to_open = request.args.get('url', '')
 
-    # 1. SEARCH LOGIC (Google Web Light ke naye raste se)
-    if query:
-        # Hum Google Search ko directly bypass karke Web Light par bhejenge
-        # Isse white screen nahi aayegi
-        search_target = f"https://www.google.com/search?q={query}"
-        gateway = f"https://googleweblight.com/i?u={search_target}"
-        return render_template_string(f'<meta http-equiv="refresh" content="0; url={gateway}">')
-
-    # 2. SITE OPEN LOGIC
+    # AGAR USER NE URL DAALA HAI (20 Seconds Wait Logic)
     if url_to_open:
-        # Instagram/Facebook ke liye force mobile optimization
-        if "instagram.com" in url_to_open:
-            url_to_open = "https://www.social-searcher.com/google-social-search/?q=instagram+login"
-        
-        gateway = f"https://googleweblight.com/i?u={url_to_open}"
-        return render_template_string(f'<meta http-equiv="refresh" content="0; url={gateway}">')
+        if not url_to_open.startswith('http'):
+            url_to_open = 'https://' + url_to_open
+            
+        return f'''
+        <div style="text-align:center; padding-top:50px; font-family:sans-serif;">
+            <h2 style="color:#de5833;">Connecting Safely...</h2>
+            <p style="font-size:18px;">Please wait for <b>20 seconds</b> while we prepare your page.</p>
+            
+            <div style="margin:20px auto; width:80%; background:#eee; height:10px; border-radius:5px;">
+                <div style="width:0%; background:#de5833; height:10px; border-radius:5px; animation: progress 20s linear forwards;"></div>
+            </div>
 
-    # 3. CLEAN HOME UI
+            <p style="color:#888;">Live conversation processing...</p>
+
+            <style>
+                @keyframes progress {{
+                    from {{ width: 0%; }}
+                    to {{ width: 100%; }}
+                }}
+            </style>
+
+            <meta http-equiv="refresh" content="20; url={url_to_open}">
+        </div>
+        '''
+
+    # SIMPLE HOME UI (Sirf URL Address Box)
     return '''
-    <div style="text-align:center; padding:20px; font-family:sans-serif; background:#fff; min-height:100vh;">
-        <h1 style="color:#4285F4; font-size:40px;">Jio<span style="color:#34A853;">Lite</span></h1>
+    <div style="text-align:center; padding:40px; font-family:sans-serif; background:#fff; min-height:100vh;">
+        <h1 style="color:#333; font-size:30px;">Jio<span style="color:#de5833;">Gateway</span></h1>
+        <p style="color:#666;">Enter Website Address to Open</p>
         
-        <form action="/" method="get">
-            <input type="text" name="q" placeholder="Search anything..." 
-                   style="width:85%; padding:15px; border:1px solid #ddd; border-radius:25px; outline:none; font-size:16px;">
+        <form action="/" method="get" style="margin-top:30px;">
+            <input type="text" name="url" placeholder="example.com" 
+                   style="width:85%; padding:15px; border:2px solid #333; border-radius:10px; outline:none; font-size:16px;">
             <br><br>
-            <button type="submit" style="padding:12px 30px; background:#4285F4; color:white; border:none; border-radius:20px; font-weight:bold;">Search Engine</button>
+            <button type="submit" style="width:90%; padding:15px; background:#333; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
+                OPEN WEBSITE
+            </button>
         </form>
 
-        <div style="margin-top:40px; display:grid; gap:15px; justify-content:center;">
-            <a href="/?url=https://m.facebook.com" style="width:200px; padding:12px; background:#3b5998; color:white; text-decoration:none; border-radius:10px;">Facebook</a>
-            <a href="/?url=https://www.instagram.com" style="width:200px; padding:12px; background:#e1306c; color:white; text-decoration:none; border-radius:10px;">Instagram</a>
-            <a href="/?url=https://y2mate.is" style="width:200px; padding:12px; background:#ff0000; color:white; text-decoration:none; border-radius:10px;">YouTube Downloader</a>
+        <div style="margin-top:50px; padding:15px; border:1px dashed #ccc; border-radius:10px;">
+            <p style="font-size:12px; color:#888;">Note: Every link will take exactly 20 seconds to load for security processing.</p>
         </div>
-        
-        <p style="margin-top:30px; font-size:12px; color:#999;">Agar white screen aaye toh 5 second wait karein ya page refresh karein.</p>
     </div>
     '''
 
