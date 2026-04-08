@@ -3,25 +3,16 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import time
-import re
 
 app = Flask(__name__)
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (SymbianOS/9.4; Series60/5.0 NokiaN97-1/20.0.019; Profile/MIDP-2.1 Configuration/CLDC-1.1) AppleWebKit/525 (KHTML, like Gecko) BrowserNG/7.1.18124"}
 
 def smart_url_repair(url):
-    """AI logic to fix broken URLs"""
     url = url.replace('%20', '').replace(' ', '').strip().lower()
     if not url: return ""
-    
-    # Agar dot nahi hai toh .com lagao
-    if "." not in url:
-        url += ".com"
-    
-    # Protocol fix (https add karna)
-    if not url.startswith(('http://', 'https://')):
-        url = 'https://' + url
-        
+    if "." not in url: url += ".is" # Y2mate ke liye default .is
+    if not url.startswith(('http://', 'https://')): url = 'https://' + url
     return url
 
 @app.route('/', methods=['GET', 'POST'])
@@ -34,7 +25,8 @@ def proxy():
         time.sleep(20)
 
         try:
-            if request.method == 'POST':
+            # Y2mate Search handling
+            if request.method == 'POST' or 'search' in target_url:
                 res = requests.post(target_url, data=request.form, headers=HEADERS, timeout=15)
             else:
                 res = requests.get(target_url, headers=HEADERS, timeout=15)
@@ -45,41 +37,33 @@ def proxy():
             for s in soup(["script", "iframe", "ins", "style", "video"]):
                 s.decompose()
 
-            # Fix Links, Forms, and Images
-            for tag in soup.find_all(['a', 'form', 'img']):
+            # Fix Links & Forms for No-JS Browsers
+            for tag in soup.find_all(['a', 'form']):
                 if tag.name == 'a' and tag.get('href'):
                     tag['href'] = f"/?url={urljoin(target_url, tag['href'])}"
-                    tag['style'] = "display:block; padding:8px; color:#d32f2f; text-decoration:none;"
-                elif tag.name == 'form' and tag.get('action'):
-                    tag['action'] = f"/?url={urljoin(target_url, tag['action'])}"
+                elif tag.name == 'form':
+                    # Y2mate ke search form ko force karna
+                    tag['action'] = f"/?url={urljoin(target_url, tag.get('action', ''))}"
                     tag['method'] = 'POST'
-                elif tag.name == 'img' and tag.get('src'):
-                    # Images ko chhota aur lite banana
-                    tag['src'] = urljoin(target_url, tag['src'])
-                    tag['style'] = "max-width:100px; height:auto; display:block;"
 
             return f'''
-            <div style="background:#d32f2f; color:white; padding:10px; text-align:center; font-family:sans-serif;">
-                <b>AI Optimized View</b> | <a href="/" style="color:yellow;">[ NEW URL ]</a>
+            <div style="background:#000; color:white; padding:10px; text-align:center;">
+                <b>AI Smart View</b> | <a href="/" style="color:yellow;">[ HOME ]</a>
             </div>
             <div style="padding:10px; font-family:sans-serif;">
-                {soup.body.decode_contents() if soup.body else "Error: Empty Content"}
+                {soup.body.decode_contents() if soup.body else "No Results Found."}
             </div>
             '''
         except Exception as e:
-            return f"Error connecting to <b>{target_url}</b>. <a href='/'>Try again</a>"
+            return f"Error: {str(e)}. <a href='/'>Back</a>"
 
     return '''
     <div style="text-align:center; padding:40px 10px; font-family:sans-serif;">
-        <h2 style="color:#d32f2f;">Smart <span style="color:#333;">JioProxy</span></h2>
-        <p style="font-size:12px; color:#666;">Enter any site name (AI will fix it)</p>
+        <h2 style="color:#f44336;">Smart JioProxy</h2>
         <form action="/" method="GET">
-            <input type="text" name="url" placeholder="facebook or y2mate.is" 
-                   style="width:90%; padding:15px; border:2px solid #d32f2f; border-radius:10px;">
+            <input type="text" name="url" placeholder="y2mate.is" style="width:90%; padding:15px; border:2px solid #f44336; border-radius:10px;">
             <br><br>
-            <button type="submit" style="width:95%; padding:15px; background:#d32f2f; color:white; border:none; border-radius:10px; font-weight:bold;">
-                OPEN SECURELY
-            </button>
+            <button type="submit" style="width:95%; padding:15px; background:#f44336; color:white; border:none; border-radius:10px; font-weight:bold;">OPEN SITE</button>
         </form>
     </div>
     '''
