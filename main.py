@@ -1,56 +1,66 @@
 from flask import Flask, render_template_string, request
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 
 app = Flask(__name__)
+
+# Opera Mini ko pasand aane wala headers
+HEADERS = {"User-Agent": "Opera/9.80 (Android; Opera Mini/36.1.2254/120.184; U; en) Presto/2.12.423 Version/12.16"}
 
 @app.route('/')
 def home():
     url_to_open = request.args.get('url', '')
 
-    # AGAR USER NE URL DAALA HAI (20 Seconds Wait Logic)
-    if url_to_open:
-        if not url_to_open.startswith('http'):
-            url_to_open = 'https://' + url_to_open
-            
+    # STEP 1: Timer Page (Har Link se pehle 20 Seconds wait)
+    # Isme koi animation nahi hai, sirf simple text taaki Opera Mini support kare
+    wait = request.args.get('wait', '0')
+    if url_to_open and wait == '0':
         return f'''
-        <div style="text-align:center; padding-top:50px; font-family:sans-serif;">
-            <h2 style="color:#de5833;">Connecting Safely...</h2>
-            <p style="font-size:18px;">Please wait for <b>20 seconds</b> while we prepare your page.</p>
-            
-            <div style="margin:20px auto; width:80%; background:#eee; height:10px; border-radius:5px;">
-                <div style="width:0%; background:#de5833; height:10px; border-radius:5px; animation: progress 20s linear forwards;"></div>
-            </div>
-
-            <p style="color:#888;">Live conversation processing...</p>
-
-            <style>
-                @keyframes progress {{
-                    from {{ width: 0%; }}
-                    to {{ width: 100%; }}
-                }}
-            </style>
-
-            <meta http-equiv="refresh" content="20; url={url_to_open}">
-        </div>
+        <html><head><meta http-equiv="refresh" content="20; url=/?url={url_to_open}&wait=1"></head>
+        <body style="text-align:center; padding-top:100px; font-family:sans-serif;">
+            <h2>Processing...</h2>
+            <p>Please wait <b>20 seconds</b> for compression.</p>
+            <p style="color:red;">Do not go back.</p>
+        </body></html>
         '''
 
-    # SIMPLE HOME UI (Sirf URL Address Box)
-    return '''
-    <div style="text-align:center; padding:40px; font-family:sans-serif; background:#fff; min-height:100vh;">
-        <h1 style="color:#333; font-size:30px;">Jio<span style="color:#de5833;">Gateway</span></h1>
-        <p style="color:#666;">Enter Website Address to Open</p>
-        
-        <form action="/" method="get" style="margin-top:30px;">
-            <input type="text" name="url" placeholder="example.com" 
-                   style="width:85%; padding:15px; border:2px solid #333; border-radius:10px; outline:none; font-size:16px;">
-            <br><br>
-            <button type="submit" style="width:90%; padding:15px; background:#333; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
-                OPEN WEBSITE
-            </button>
-        </form>
+    # STEP 2: Compression Logic (20 Sec baad yahan aayega)
+    if url_to_open and wait == '1':
+        try:
+            if not url_to_open.startswith('http'):
+                url_to_open = 'https://' + url_to_open
+            
+            res = requests.get(url_to_open, headers=HEADERS, timeout=15)
+            soup = BeautifulSoup(res.text, 'html.parser')
 
-        <div style="margin-top:50px; padding:15px; border:1px dashed #ccc; border-radius:10px;">
-            <p style="font-size:12px; color:#888;">Note: Every link will take exactly 20 seconds to load for security processing.</p>
-        </div>
+            # Sabse bada compression: Scripts aur Styles ko khatam karna
+            for s in soup(["script", "style", "iframe", "video", "link", "svg"]):
+                s.decompose()
+
+            # Links ko proxy link mein badalna
+            for a in soup.find_all('a', href=True):
+                a['href'] = f"/?url={urljoin(url_to_open, a['href'])}"
+
+            # Page ko bahut halka (Lite) banana
+            return f'''
+            <div style="background:#000; color:#fff; padding:10px; text-align:center;">
+                <a href="/" style="color:yellow;">[ BACK TO HOME ]</a>
+            </div>
+            <div style="padding:10px; font-family:serif;">{soup.body.decode_contents()}</div>
+            '''
+        except:
+            return "Site block hai ya address galat hai. <a href='/'>Wapas jayein</a>"
+
+    # STEP 3: Simple Home UI (Opera Mini Best Support)
+    return '''
+    <div style="text-align:center; padding:20px; font-family:sans-serif;">
+        <h1 style="color:red;">Jio<span style="color:black;">Lite</span></h1>
+        <form action="/" method="get">
+            <input type="text" name="url" placeholder="Enter Website Address" style="width:90%; padding:10px;">
+            <br><br>
+            <button type="submit" style="width:90%; padding:12px; background:red; color:white; border:none;">OPEN LITE VERSION</button>
+        </form>
     </div>
     '''
 
