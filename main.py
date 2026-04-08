@@ -1,81 +1,50 @@
 from flask import Flask, render_template_string, request
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
 
 app = Flask(__name__)
 
-# Real Chrome Browser ki tarah dikhne ke liye headers
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-    "Connection": "keep-alive",
-}
-
 @app.route('/')
-def proxy():
-    # 1. Search ya URL nikalna
+def home():
     query = request.args.get('q', '')
-    target_url = request.args.get('url', '')
+    url_to_open = request.args.get('url', '')
 
-    # Agar user search kare toh Google Search fetch karo
+    # 1. SEARCH LOGIC (Google Web Light ke naye raste se)
     if query:
-        target_url = f"https://www.google.com/search?q={query}"
+        # Hum Google Search ko directly bypass karke Web Light par bhejenge
+        # Isse white screen nahi aayegi
+        search_target = f"https://www.google.com/search?q={query}"
+        gateway = f"https://googleweblight.com/i?u={search_target}"
+        return render_template_string(f'<meta http-equiv="refresh" content="0; url={gateway}">')
 
-    # Default Home Page
-    if not target_url and not query:
-        return '''
-        <div style="text-align:center; padding:20px; font-family:sans-serif; background:#f0f2f5; min-height:100vh;">
-            <h1 style="color:#007bff;">Jio<span style="color:#333;">Proxy</span></h1>
-            <form action="/" method="get">
-                <input type="text" name="q" placeholder="Google Search..." style="width:80%; padding:12px; border-radius:20px; border:1px solid #ccc;">
-                <br><br>
-                <button type="submit" style="padding:10px 25px; background:#007bff; color:white; border:none; border-radius:15px;">Search</button>
-            </form>
-            <div style="margin-top:25px; display:grid; gap:10px;">
-                <a href="/?url=https://m.facebook.com" style="padding:10px; background:#3b5998; color:white; text-decoration:none; border-radius:5px;">Facebook Lite</a>
-                <a href="/?url=https://www.instagram.com/accounts/login/" style="padding:10px; background:#e1306c; color:white; text-decoration:none; border-radius:5px;">Instagram Login</a>
-                <a href="/?url=https://y2mate.is" style="padding:10px; background:#ff0000; color:white; text-decoration:none; border-radius:5px;">Video Downloader</a>
-            </div>
-        </div>
-        '''
-
-    # 2. Site ko Fetch karna (Proxy Logic)
-    try:
-        if not target_url.startswith('http'):
-            target_url = 'https://' + target_url
-
-        response = requests.get(target_url, headers=HEADERS, timeout=15, allow_redirects=True)
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        # 3. Link Rewriting (Sari links ko aapki site ke through bhejna)
-        for tag in soup.find_all(['a', 'form'], href=True, action=True):
-            if tag.name == 'a':
-                original_href = tag['href']
-                full_url = urljoin(target_url, original_href)
-                tag['href'] = f"/?url={full_url}"
-            elif tag.name == 'form':
-                original_action = tag['action']
-                full_url = urljoin(target_url, original_action)
-                tag['action'] = f"/?url={full_url}"
-
-        # 4. Compression (Ads aur bhari scripts hatana)
-        for script in soup(["script", "style", "iframe", "ins"]):
-            script.decompose()
-
-        # Header bar taaki user wapas home ja sake
-        proxy_header = f'''
-        <div style="background:#333; color:white; padding:10px; text-align:center; font-family:sans-serif;">
-            <a href="/" style="color:yellow; text-decoration:none;">[ New Search ]</a> | 
-            <span style="font-size:12px;">Browsing: {urlparse(target_url).netloc}</span>
-        </div>
-        '''
+    # 2. SITE OPEN LOGIC
+    if url_to_open:
+        # Instagram/Facebook ke liye force mobile optimization
+        if "instagram.com" in url_to_open:
+            url_to_open = "https://www.social-searcher.com/google-social-search/?q=instagram+login"
         
-        return proxy_header + soup.prettify()
+        gateway = f"https://googleweblight.com/i?u={url_to_open}"
+        return render_template_string(f'<meta http-equiv="refresh" content="0; url={gateway}">')
 
-    except Exception as e:
-        return f'<div style="padding:20px;"><h3>Error: Link nahi khul raha.</h3><p>{str(e)}</p><a href="/">Back to Home</a></div>'
+    # 3. CLEAN HOME UI
+    return '''
+    <div style="text-align:center; padding:20px; font-family:sans-serif; background:#fff; min-height:100vh;">
+        <h1 style="color:#4285F4; font-size:40px;">Jio<span style="color:#34A853;">Lite</span></h1>
+        
+        <form action="/" method="get">
+            <input type="text" name="q" placeholder="Search anything..." 
+                   style="width:85%; padding:15px; border:1px solid #ddd; border-radius:25px; outline:none; font-size:16px;">
+            <br><br>
+            <button type="submit" style="padding:12px 30px; background:#4285F4; color:white; border:none; border-radius:20px; font-weight:bold;">Search Engine</button>
+        </form>
+
+        <div style="margin-top:40px; display:grid; gap:15px; justify-content:center;">
+            <a href="/?url=https://m.facebook.com" style="width:200px; padding:12px; background:#3b5998; color:white; text-decoration:none; border-radius:10px;">Facebook</a>
+            <a href="/?url=https://www.instagram.com" style="width:200px; padding:12px; background:#e1306c; color:white; text-decoration:none; border-radius:10px;">Instagram</a>
+            <a href="/?url=https://y2mate.is" style="width:200px; padding:12px; background:#ff0000; color:white; text-decoration:none; border-radius:10px;">YouTube Downloader</a>
+        </div>
+        
+        <p style="margin-top:30px; font-size:12px; color:#999;">Agar white screen aaye toh 5 second wait karein ya page refresh karein.</p>
+    </div>
+    '''
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
