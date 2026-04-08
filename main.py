@@ -6,67 +6,73 @@ import time
 
 app = Flask(__name__)
 
-# Ultra-Lite User Agent for Feature Phones
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"}
+# Nokia 206 User-Agent is best for Lite sites
+HEADERS = {"User-Agent": "Mozilla/5.0 (Nokia206/2.0) AppleWebKit/534.46 (KHTML, like Gecko) Safari/534.46"}
 
-def smart_url_repair(url):
-    url = url.replace('%20', '').replace(' ', '').strip().lower()
-    if not url: return ""
-    if "." not in url: url += ".is"
-    if not url.startswith(('http://', 'https://')): url = 'https://' + url
-    return url
+def smart_url(text):
+    text = text.strip()
+    if "." in text and " " not in text:
+        return 'https://' + text if not text.startswith('http') else text
+    return f"https://www.google.com/search?q={text.replace(' ', '+')}&gbv=1"
 
 @app.route('/', methods=['GET', 'POST'])
 def proxy():
-    raw_url = request.args.get('url', '')
-    target_url = smart_url_repair(raw_url) if raw_url else ""
-
-    if target_url:
-        # --- PHASE 1: BACKGROUND CONVERSATION WAIT (20 SEC) ---
-        time.sleep(20)
+    query = request.args.get('url', '')
+    if query:
+        target = smart_url(query)
+        time.sleep(20) # 20 Sec Wait
 
         try:
-            # --- PHASE 2: BACKGROUND SEARCH LOADING ---
-            # Hum server-side par hi Y2mate ko result nikalne par majboor karenge
-            if request.method == 'POST':
-                res = requests.post(target_url, data=request.form, headers=HEADERS, timeout=20)
-            else:
-                res = requests.get(target_url, headers=HEADERS, timeout=20)
-
+            res = requests.get(target, headers=HEADERS, timeout=20)
             soup = BeautifulSoup(res.text, 'html.parser')
 
-            # Sabhi loading wheels aur scripts ko pehle hi khatam karo
-            for s in soup(["script", "style", "iframe", "ins", "link"]):
+            # Clean heavy stuff
+            for s in soup(["script", "style", "iframe", "ins", "header", "footer", "nav"]):
                 s.decompose()
 
-            # Y2mate ke result table ko fix karna
+            # --- CSS AI Fix: Har button ko line mein lane ke liye ---
+            custom_style = """
+            <style>
+                * { box-sizing: border-box; }
+                body { font-family: sans-serif; background: #fff; margin: 0; padding: 5px; color: #000; }
+                /* Har link ko button jaisa banao */
+                a { display: block !important; width: 100% !important; padding: 12px !important; margin: 5px 0 !important; 
+                    background: #f9f9f9 !important; border: 1px solid #ddd !important; border-radius: 4px !important; 
+                    text-decoration: none !important; color: #333 !important; font-size: 14px !important; text-align: left; }
+                /* Inputs ko fix karo */
+                input[type="text"], input[type="search"] { width: 100% !important; padding: 12px !important; 
+                    margin: 8px 0 !important; border: 2px solid #333 !important; border-radius: 5px !important; display: block; }
+                /* Buttons ko fix karo */
+                button, input[type="submit"] { width: 100% !important; background: #333 !important; color: #fff !important; 
+                    padding: 15px !important; border: none !important; border-radius: 5px !important; 
+                    font-weight: bold !important; display: block !important; margin: 10px 0 !important; }
+                img { max-width: 100px; height: auto; }
+                table, tr, td { display: block !important; width: 100% !important; } /* Tables ko todna */
+            </style>
+            """
+
             for tag in soup.find_all(['a', 'form']):
                 if tag.name == 'a' and tag.get('href'):
-                    tag['href'] = f"/?url={urljoin(target_url, tag['href'])}"
+                    tag['href'] = f"/?url={urljoin(target, tag['href'])}"
                 elif tag.name == 'form':
-                    tag['action'] = f"/?url={urljoin(target_url, tag.get('action', ''))}"
-                    tag['method'] = 'POST'
+                    tag['action'] = f"/?url={urljoin(target, tag.get('action', ''))}"
+                    tag['method'] = 'GET'
 
-            # Result page return karna
-            return f'''
-            <div style="background:#cc0000; color:white; padding:10px; text-align:center; font-family:sans-serif;">
-                <b>AI Results Loaded</b> | <a href="/" style="color:yellow; text-decoration:none;">[ NEW SEARCH ]</a>
-            </div>
-            <div style="padding:15px; font-family:sans-serif; background:#fff;">
-                {soup.body.decode_contents() if soup.body else "Result load nahi hua. Wapas try karein."}
-            </div>
-            '''
-        except Exception as e:
-            return f"Error: {str(e)}. <a href='/'>Back</a>"
+            content = soup.body.decode_contents() if soup.body else "Empty content"
+            
+            return f"<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>{custom_style}</head><body>" \
+                   f"<div style='background:#000;color:#fff;padding:10px;text-align:center;'><b>SMART GATEWAY</b> | <a href='/' style='display:inline;color:yellow;background:none;border:none;padding:0;'>[HOME]</a></div>" \
+                   f"{content}</body></html>"
+        except:
+            return "Connection Error. <a href='/'>Retry</a>"
 
     return '''
-    <div style="text-align:center; padding:50px 10px; font-family:sans-serif;">
-        <h2 style="color:#cc0000;">Smart Downloader</h2>
-        <p style="font-size:12px;">URL dalein aur 20 sec wait karein.</p>
+    <div style="text-align:center; padding:40px 10px; font-family:sans-serif;">
+        <h2 style="color:#333;">Jio<span style="color:#f44336;">Lite</span> Gateway</h2>
         <form action="/" method="GET">
-            <input type="text" name="url" placeholder="y2mate.is" style="width:85%; padding:15px; border:1px solid #cc0000; border-radius:10px;">
+            <input type="text" name="url" placeholder="Search or URL" style="width:90%; padding:15px; border:2px solid #333; border-radius:10px;">
             <br><br>
-            <button type="submit" style="width:90%; padding:15px; background:#cc0000; color:white; border:none; border-radius:10px; font-weight:bold;">OPEN & COMPRESS</button>
+            <button type="submit" style="width:95%; padding:15px; background:#333; color:white; border:none; border-radius:10px; font-weight:bold;">OPEN (20s WAIT)</button>
         </form>
     </div>
     '''
