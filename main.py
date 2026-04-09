@@ -21,21 +21,25 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 5px; margin: 0; }
-        .header { background: #cc0000; padding: 10px; font-weight: bold; margin-bottom: 10px; }
-        .box { border: 1px dashed #444; padding: 10px; margin: 10px; background: #111; }
+        .header { background: #cc0000; padding: 10px; font-weight: bold; margin-bottom: 5px; }
+        .dev-name { font-size: 12px; color: #ffc107; display: block; margin-top: 3px; }
+        .box { border: 2px dashed #444; padding: 10px; margin: 10px; background: #111; }
         .v-card { border-bottom: 1px solid #333; padding: 15px 0; margin: 0 10px; }
         .thumb { width: 160px; height: 120px; object-fit: cover; border: 1px solid #555; background: #222; }
-        .btn-up { background: #28a745; color: white; padding: 10px; width: 100%; border: none; margin-top: 5px; }
-        .btn-dl { background: #007bff; color: white; text-decoration: none; padding: 10px; display: block; margin: 10px auto; width: 80%; border-radius: 5px; font-size: 14px; }
-        .search-box { background: #222; padding: 10px; border-bottom: 1px solid #cc0000; }
+        .btn-up { background: #28a745; color: white; padding: 10px; width: 100%; border: none; margin-top: 5px; font-weight: bold; }
+        .btn-dl { background: #007bff; color: white; text-decoration: none; padding: 12px; display: block; margin: 10px auto; width: 80%; border-radius: 5px; font-weight: bold; }
+        .search-box { background: #222; padding: 10px; border-bottom: 1px solid #cc0000; margin-bottom: 10px; }
         input[type="text"] { width: 65%; padding: 8px; background: #000; color: #fff; border: 1px solid #555; }
-        .btn-search { padding: 8px; background: #cc0000; color: #fff; border: none; font-weight: bold; }
+        .btn-search { padding: 8px 15px; background: #cc0000; color: #fff; border: none; font-weight: bold; }
         .nav-box { padding: 20px; }
         .nav-btn { color: #ffc107; text-decoration: none; font-weight: bold; padding: 10px; border: 1px solid #444; margin: 5px; display: inline-block; min-width: 80px; }
     </style>
 </head>
 <body>
-    <div class="header">Jio Video Cloud</div>
+    <div class="header">
+        Jio Video Cloud
+        <span class="dev-name">(ATIF-khan) developer</span>
+    </div>
 
     <div class="search-box">
         <form action="/" method="GET">
@@ -72,45 +76,3 @@ HTML_TEMPLATE = """
     </div>
 </body>
 </html>
-"""
-
-@app.route('/')
-def index():
-    query = request.args.get('q', '').strip()
-    cursor = request.args.get('cursor')
-    
-    try:
-        # Purana aur safe tarika (Internal Server Error nahi dega)
-        # Search filter hum manual apply karenge agar query hai
-        res = cloudinary.api.resources(
-            resource_type="video",
-            type="upload",
-            max_results=10,  # Ek page par 10 video
-            next_cursor=cursor
-        )
-        
-        all_videos = res.get('resources', [])
-        next_cursor = res.get('next_cursor')
-
-        # Agar search query hai, toh list mein se filter karo
-        if query:
-            filtered_videos = [v for v in all_videos if query.lower() in v['public_id'].lower()]
-            return render_template_string(HTML_TEMPLATE, videos=filtered_videos, q=query, next_cursor=next_cursor)
-        
-        return render_template_string(HTML_TEMPLATE, videos=all_videos, q=query, next_cursor=next_cursor)
-    
-    except Exception as e:
-        return f"Server Error: {str(e)}. Please check your Cloudinary connection."
-
-@app.route('/upload', methods=['POST'])
-def upload():
-    file = request.files['file']
-    if file:
-        try:
-            cloudinary.uploader.upload_video(file, resource_type="video")
-        except:
-            pass
-    return redirect('/')
-
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
